@@ -25,5 +25,39 @@
 •	Complete reusable workflow structure: one workflow calls another
 •	All secrets managed via GitHub Environments, not repository secrets
 ```
+## CI's job is to produce and verify an artefact. Delivery is ArgoCD's job.
+
+# Pipeline Stage Overview
+```console
+Stage 1: Test + Lint
+  ├── Python unit tests (pytest)
+  ├── Helm lint (helm lint --strict)
+  └── helm-unittest (chart unit tests)
+
+Stage 2: Build (depends on Stage 1)
+  ├── docker buildx build (multi-platform: linux/amd64 + linux/arm64)
+  ├── BuildKit cache mount (faster rebuilds)
+  └── Push to GHCR with SHA tag
+
+Stage 3: Security Scan (depends on Stage 2)
+  ├── trivy image scan
+  ├── CRITICAL CVE → fail build (exit non-zero)
+  └── Scan report uploaded as GitHub Actions artefact
+
+Stage 4: Sign + Attest (depends on Stage 3)
+  ├── cosign sign (keyless — OIDC via GitHub Actions)
+  ├── syft generate SBOM (CycloneDX JSON)
+  └── cosign attest (attach SBOM to image in registry)
+
+Stage 5: Helm Package (parallel with Stage 4)
+  ├── helm package ./charts/myapp
+  └── helm push oci://ghcr.io/org/charts
+
+Stage 6: GitOps Update (depends on Stage 4)
+  ├── Clone gitops-repo
+  ├── Update envs/dev/values.yaml: image.tag: $DIGEST
+  ├── Commit + push (direct to dev, PR for staging/prod)
+  └── ArgoCD webhook fires → sync begins
+```
 
 
