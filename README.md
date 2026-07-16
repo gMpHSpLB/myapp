@@ -14,6 +14,7 @@
   Helm 3.16+
 ```
 # What You Will Build
+```console
 •	A production-grade GitHub Actions CI pipeline with 6 stages
 •	Container image built with multi-stage Dockerfile using BuildKit cache mounts
 •	Trivy vulnerability scan as a hard blocking gate (CRITICAL CVEs fail the build)
@@ -23,5 +24,6 @@
 •	Image tag committed to the GitOps repo as a PR (triggering ArgoCD sync)
 •	Complete reusable workflow structure: one workflow calls another
 •	All secrets managed via GitHub Environments, not repository secrets
+```
 
 
