@@ -588,11 +588,11 @@ jobs:
           cat >> $GITHUB_STEP_SUMMARY << 'SUMMARY'
           ## Deployment Summary
 
-          | Environment | Status |
-          |---|---|
-          | dev | ✅ Auto-deployed via ArgoCD |
-          | staging | 🔲 PR created — requires approval |
-          | prod | 🔲 Requires staging validation first |
+          | Environment | Status                                |
+          |-------------|---------------------------------------|
+          | dev         | ✅ Auto-deployed via ArgoCD           |
+          | staging     | 🔲 PR created — requires approval     |
+          | prod        | 🔲 Requires staging validation first  |
 
           **Image:** `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build.outputs.image-digest }}`
 
