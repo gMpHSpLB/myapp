@@ -1,0 +1,94 @@
+suite: Deployment template tests
+templates:
+  - deployment.yaml
+
+tests:
+  - it: should render with default values
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-myapp
+
+  - it: should set replica count from values
+    set:
+      replicaCount: 3
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+
+  - it: should NOT set replicas when HPA is enabled
+    set:
+      autoscaling.enabled: true
+      autoscaling.minReplicas: 2
+      autoscaling.maxReplicas: 10
+    asserts:
+      - notExists:
+          path: spec.replicas
+
+  - it: should set image correctly
+    set:
+      image.repository: myregistry.io/myapp
+      image.tag: "v2.0.0"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: myregistry.io/myapp:v2.0.0
+
+  - it: should set non-root security context
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 1000
+
+  - it: should drop all capabilities
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          content: ALL
+
+  - it: should use readOnlyRootFilesystem
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+
+  - it: should NOT mount service account token
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+
+  - it: should use RollingUpdate strategy with zero unavailable
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: RollingUpdate
+      - equal:
+          path: spec.strategy.rollingUpdate.maxUnavailable
+          value: 0
+
+  - it: should include checksum annotations for config reload
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config"]
+      - exists:
+          path: spec.template.metadata.annotations["checksum/secret"]
+
+  - it: should use externalSecretName when set
+    set:
+      externalSecretName: myapp-vault-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: myapp-vault-secret
+                key: DB_PASSWORD

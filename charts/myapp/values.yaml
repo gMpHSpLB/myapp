@@ -1,0 +1,232 @@
+# =============================================================================
+# myapp Helm Chart — Default Values
+# =============================================================================
+# These are the SAFE DEFAULTS for a development environment.
+# Production overrides must be explicit in values-prod.yaml.
+# Every key is documented. No silent defaults.
+
+# ── GLOBAL ───────────────────────────────────────────────────────────────────
+# Override the chart name (affects all resource names)
+nameOverride: ""
+fullnameOverride: ""
+
+# Environment identifier — injected as label and env var
+# Valid values: dev | staging | prod
+environment: dev
+
+# ── IMAGE ────────────────────────────────────────────────────────────────────
+image:
+  repository: nginx
+  # tag: defaults to Chart.AppVersion if not set
+  tag: "1.25-alpine"
+  # Always | IfNotPresent | Never
+  # Production: use IfNotPresent (image is immutable by tag in your registry)
+  # Development: use Always if you push to the same tag repeatedly (bad practice)
+  pullPolicy: IfNotPresent
+
+# Image pull secrets — required if your registry is private
+imagePullSecrets: []
+# - name: registry-credentials
+
+# ── REPLICA & SCALING ─────────────────────────────────────────────────────────
+replicaCount: 1
+
+# HorizontalPodAutoscaler — disabled by default, enabled in prod values
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  # Target average CPU utilisation across all pods (percentage)
+  targetCPUUtilizationPercentage: 70
+  # Optional: scale on memory too
+  targetMemoryUtilizationPercentage: 80
+
+# ── SERVICE ACCOUNT ───────────────────────────────────────────────────────────
+serviceAccount:
+  # Create a dedicated ServiceAccount (recommended — never use 'default')
+  create: true
+  # Annotations to add to the ServiceAccount
+  # Use for IRSA (AWS), Workload Identity (GCP), etc.
+  annotations: {}
+  # Override the generated name
+  name: ""
+  # Most application pods should NOT talk to the Kubernetes API
+  automountServiceAccountToken: false
+
+# ── POD METADATA ──────────────────────────────────────────────────────────────
+# Extra annotations on the Pod spec (not the Deployment)
+# Common use: inject Prometheus scrape config, Vault agent, Datadog APM
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8000"
+  prometheus.io/path: "/metrics"
+
+# Extra labels on the Pod spec
+podLabels: {}
+
+# ── SECURITY CONTEXTS ─────────────────────────────────────────────────────────
+# Pod-level security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 2000
+  # Restrict syscalls to a safe subset
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container-level security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# ── CONTAINER PORTS ───────────────────────────────────────────────────────────
+containerPort: 80
+
+# ── RESOURCES ────────────────────────────────────────────────────────────────
+# RULE: requests = baseline observed usage
+#       limits   = 2-3x requests for memory, same or 2x for CPU
+# Missing requests → bad scheduling
+# Missing limits   → OOMKill risk to neighbours
+resources:
+  requests:
+    memory: "32Mi"
+    cpu: "25m"
+  limits:
+    memory: "64Mi"
+    cpu: "100m"
+
+# ── HEALTH PROBES ─────────────────────────────────────────────────────────────
+# Readiness: traffic only when passing
+# Liveness: container restart when failing
+# Startup: blocks liveness/readiness until passing (for slow starters)
+probes:
+  readiness:
+    path: /
+    port: 80
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+  liveness:
+    path: /
+    port: 80
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    failureThreshold: 3
+    successThreshold: 1
+  startup:
+    path: /
+    port: 80
+    failureThreshold: 30
+    periodSeconds: 2
+
+# ── SERVICE ───────────────────────────────────────────────────────────────────
+service:
+  # ClusterIP (internal only) | NodePort | LoadBalancer
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+  # Only used when type=NodePort. Omit to let Kubernetes choose.
+  nodePort: null
+  annotations: {}
+
+# ── INGRESS ───────────────────────────────────────────────────────────────────
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+  # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: myapp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  # - secretName: myapp-tls
+  #   hosts:
+  #     - myapp.example.com
+
+# ── CONFIGURATION ─────────────────────────────────────────────────────────────
+# These become ConfigMap data keys
+config:
+  APP_ENV: "dev"
+  APP_LOG_LEVEL: "info"
+  APP_PORT: "8000"
+  APP_WORKERS: "2"
+
+# ── SECRETS ───────────────────────────────────────────────────────────────────
+# WARNING: Do NOT put real secrets here in production.
+# Use External Secrets Operator instead.
+# These are placeholders for local development only.
+secrets:
+  DB_PASSWORD: ""
+  API_KEY: ""
+
+# Reference to an externally-managed secret
+# When set, the Deployment reads env vars from this secret instead
+externalSecretName: ""
+
+# ── NETWORKING ────────────────────────────────────────────────────────────────
+networkPolicy:
+  enabled: false
+  # Ingress: allow traffic only from ingress-nginx namespace
+  ingressNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: ingress-nginx
+  # Egress: allow traffic only to monitoring namespace
+  egressNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: monitoring
+
+# ── DISRUPTION BUDGET ─────────────────────────────────────────────────────────
+podDisruptionBudget:
+  enabled: false
+  # minAvailable: 1 means at least 1 pod always running during node drain
+  # CAUTION: with replicas=1, this blocks node drain entirely
+  minAvailable: 1
+
+# ── DEPLOYMENT STRATEGY ───────────────────────────────────────────────────────
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# ── SCHEDULING ────────────────────────────────────────────────────────────────
+# Spread pods across nodes — required for HA in multi-node clusters
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: myapp
+          topologyKey: kubernetes.io/hostname
+
+tolerations: []
+nodeSelector: {}
+
+# ── TERMINATION ───────────────────────────────────────────────────────────────
+# Seconds Kubernetes waits for in-flight requests before force-killing
+terminationGracePeriodSeconds: 30
+
+# ── EXTRA ENV VARS ─────────────────────────────────────────────────────────────
+# Inject arbitrary env vars without modifying the chart
+extraEnv: []
+# - name: FEATURE_FLAG_X
+#   value: "true"
+
+# ── EXTRA VOLUMES ─────────────────────────────────────────────────────────────
+extraVolumes: []
+extraVolumeMounts: []
+
+# ── INIT CONTAINERS ───────────────────────────────────────────────────────────
+initContainers: []
+# - name: wait-for-db
+#   image: busybox:1.35
+#   command: ['sh', '-c', 'until nc -z postgres 5432; do sleep 2; done'] 

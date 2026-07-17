@@ -1,0 +1,43 @@
+# Staging environment — mirrors prod settings but not prod traffic
+# Use this to catch configuration errors before production
+
+environment: staging
+
+replicaCount: 2
+
+image:
+  tag: "1.25-alpine"
+
+config:
+  APP_ENV: "staging"
+  APP_LOG_LEVEL: "info"
+  APP_WORKERS: "2"
+
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "50m"
+  limits:
+    memory: "128Mi"
+    cpu: "200m"
+
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: true
+  hosts:
+    - host: myapp-staging.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+autoscaling:
+  enabled: false
+
+networkPolicy:
+  enabled: true

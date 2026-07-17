@@ -1,0 +1,33 @@
+# Dev environment — local minikube
+# Relaxed settings, verbose logging, NodePort for easy access
+environment: dev
+
+replicaCount: 1
+
+image:
+  tag: "1.25-alpine"
+
+config:
+  APP_ENV: "dev"
+  APP_LOG_LEVEL: "debug"
+  APP_WORKERS: "1"
+
+resources:
+  requests:
+    memory: "32Mi"
+    cpu: "25m"
+  limits:
+    memory: "64Mi"
+    cpu: "100m"
+
+service:
+  type: NodePort
+  nodePort: 30081
+
+# In dev, no PDB — single replica blocks node drain
+podDisruptionBudget:
+  enabled: false
+
+# No HPA in dev — resource constrained local cluster
+autoscaling:
+  enabled: false

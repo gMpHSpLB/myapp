@@ -1,0 +1,37 @@
+suite: Service template tests
+templates:
+  - service.yaml
+
+tests:
+  - it: should render ClusterIP by default
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.type
+          value: ClusterIP
+
+  - it: should render NodePort with correct port when configured
+    set:
+      service.type: NodePort
+      service.nodePort: 30080
+    asserts:
+      - equal:
+          path: spec.type
+          value: NodePort
+      - equal:
+          path: spec.ports[0].nodePort
+          value: 30080
+
+  - it: should NOT set nodePort for ClusterIP service
+    set:
+      service.type: ClusterIP
+    asserts:
+      - notExists:
+          path: spec.ports[0].nodePort
+
+  - it: should use selector labels matching deployment
+    asserts:
+      - equal:
+          path: spec.selector["app.kubernetes.io/name"]
+          value: myapp

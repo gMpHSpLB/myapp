@@ -1,0 +1,44 @@
+apiVersion: v2
+name: myapp
+description: >
+  FastAPI microservice with configurable deployment strategy,
+  observability, and multi-environment support.
+  Part of the Kubernetes_ArgoCD_Rollout_Observability reference project.
+
+# v2 = Helm 3 only. v1 is Helm 2 legacy. Always use v2.
+type: application
+
+# chart version: bump this on every change to the chart itself
+# follows SemVer: MAJOR.MINOR.PATCH
+# MAJOR: breaking change in values schema
+# MINOR: new feature, backward compatible
+# PATCH: bug fix, doc update
+version: 1.0.0
+
+# appVersion: the version of the APPLICATION being packaged
+# This appears in labels and is separate from chart version
+# Typically set to the Docker image tag
+appVersion: "1.0.0"
+
+# Who owns this chart — essential for large organisations
+maintainers:
+  - name: platform-team
+    email: platform@example.com
+
+# Minimum Helm version required
+kubeVersion: ">=1.26.0-0"
+
+# Keywords used when searching chart repositories
+keywords:
+  - fastapi
+  - python
+  - api
+  - microservice
+
+# Dependencies: external charts this chart depends on
+# Uncomment when adding sub-charts (e.g. postgresql)
+# dependencies:
+#   - name: postgresql
+#     version: "12.x.x"
+#     repository: "https://charts.bitnami.com/bitnami"
+#     condition: postgresql.enabled

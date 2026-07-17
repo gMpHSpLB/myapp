@@ -27,6 +27,12 @@
 ```
 ## CI's job is to produce and verify an artefact. Delivery is ArgoCD's job.
 
+CI produces and verifies an artefact; ArgoCD is the only thing with cluster credentials. 
+Every design decision in this pipeline:
+   — no kubectl apply in CI, 
+   — SHA/digest tags instead of latest, 
+   — A separate GitOps repo — falls out of that one boundary.
+   
 # Pipeline Stage Overview
 ```console
 Stage 1: Test + Lint

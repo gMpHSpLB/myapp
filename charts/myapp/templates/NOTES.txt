@@ -1,0 +1,45 @@
+myapp {{ .Chart.AppVersion }} deployed to {{ .Release.Namespace }}
+Environment: {{ .Values.environment }}
+Release: {{ .Release.Name }}
+=============================================================================
+
+1. Application URL:
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else if eq .Values.service.type "NodePort" }}
+  export NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[0].address}')
+  export NODE_PORT=$(kubectl get svc {{ include "myapp.fullname" . }} -n {{ .Release.Namespace }} -o jsonpath='{.spec.ports[0].nodePort}')
+  echo "URL: http://$NODE_IP:$NODE_PORT"
+{{- else }}
+  # Port-forward to access:
+  kubectl port-forward svc/{{ include "myapp.fullname" . }} 8080:{{ .Values.service.port }} -n {{ .Release.Namespace }}
+  echo "URL: http://127.0.0.1:8080"
+{{- end }}
+
+2. Check deployment status:
+  kubectl rollout status deployment/{{ include "myapp.fullname" . }} -n {{ .Release.Namespace }}
+
+3. View logs:
+  kubectl logs -l app.kubernetes.io/name={{ include "myapp.name" . }} -n {{ .Release.Namespace }} --tail=100
+
+4. Check health:
+  kubectl get pods -l app.kubernetes.io/name={{ include "myapp.name" . }} -n {{ .Release.Namespace }}
+
+{{- if .Values.podDisruptionBudget.enabled }}
+
+5. PodDisruptionBudget active: minimum {{ .Values.podDisruptionBudget.minAvailable }} pod(s) will remain
+   available during node drain operations.
+{{- end }}
+
+{{- if .Values.autoscaling.enabled }}
+
+6. HPA active: scales between {{ .Values.autoscaling.minReplicas }} and
+   {{ .Values.autoscaling.maxReplicas }} replicas based on CPU/memory.
+{{- end }}
+
+{{- if not .Values.externalSecretName }}
+⚠  WARNING: Using chart-managed Secret. For production, set
+   externalSecretName to use an externally-managed secret.
+{{- end }}
