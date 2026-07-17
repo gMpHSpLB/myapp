@@ -408,7 +408,9 @@ jobs:
       - name: Push chart to OCI registry
         run: |
           helm push /tmp/charts/myapp-${{ steps.chart-version.outputs.version }}.tgz \
-            oci://${{ env.REGISTRY }}/${{ env.CHART_NAME }}
+            oci://${{ env.REGISTRY }}/helm-lab
+          # helm push /tmp/charts/myapp-${{ steps.chart-version.outputs.version }}.tgz \
+          #   oci://${{ env.REGISTRY }}/${{ env.CHART_NAME }}            
 
       - name: Verify chart in registry
         run: |
