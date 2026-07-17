@@ -26,7 +26,8 @@ env:
   # Image name: org/repo
   IMAGE_NAME: ${{ github.repository_owner }}/myapp
   # Helm chart: separate OCI path
-  CHART_NAME: ${{ github.repository_owner }}/charts/myapp
+  #CHART_NAME: ${{ github.repository_owner }}/charts/myapp
+  CHART_NAME: ${{ github.repository_owner }}/helm-lab
 
 permissions:
   # Minimum permissions — explicitly grant only what's needed
