@@ -583,18 +583,60 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITOPS_PAT }}
 
+      - name: Create PR to prod (not auto-merged)
+        run: |
+          DIGEST="${{ needs.build.outputs.image-digest }}"
+
+          # Create a branch for the prod update
+          BRANCH="prod-deploy-${{ github.sha }}"
+          git checkout -b $BRANCH
+
+          # Update prod values to use the same fixed image
+          yq -i ".image.digest = \"${DIGEST}\"" envs/prod/values.yaml
+          yq -i ".image.tag = \"sha-${{ github.sha }}\"" envs/prod/values.yaml
+          yq -i ".image.repository = \"${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\"" envs/prod/values.yaml
+
+          git add envs/prod/values.yaml
+          git commit -m "chore(prod): deploy ${{ github.sha }}"
+          git push origin $BRANCH
+
+          # Create PR using GitHub CLI
+          gh pr create \
+            --title "Deploy ${{ github.sha }} to prod" \
+            --body "## Changes
+
+          Deploy \`${{ env.IMAGE_NAME }}@${DIGEST}\` to prod.
+
+          **Source commit:** [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+          **CI run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          **Checklist before merging:**
+          - [ ] Staging environment validated
+          - [ ] No critical alerts in staging Grafana
+          - [ ] Production readiness confirmed (feature flags, rollout plan)
+          - [ ] QA / Product sign-off
+
+          Merging this PR will trigger ArgoCD to sync myapp-prod." \
+                      --base main \
+                      --head $BRANCH \
+                      --reviewer "${{ github.actor }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITOPS_PAT }}
+
       - name: Output summary
         run: |
           cat >> $GITHUB_STEP_SUMMARY << 'SUMMARY'
           ## Deployment Summary
 
-          | Environment | Status                                |
-          |-------------|---------------------------------------|
-          | dev         | ✅ Auto-deployed via ArgoCD           |
-          | staging     | 🔲 PR created — requires approval     |
-          | prod        | 🔲 Requires staging validation first  |
+          | Environment | Status                                         |
+          |-------------|-----------------------------------------------|
+          | dev         | ✅ Auto-deployed via ArgoCD                    |
+          | staging     | 🔲 PR created — requires approval             |
+          | prod        | 🔲 PR created — merge only after staging OK   |
 
           **Image:** `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build.outputs.image-digest }}`
 
-          **ArgoCD:** Once PR to staging is merged, run `argocd app sync myapp-staging`
+          **ArgoCD:** 
+          - After staging PR merge: run \`argocd app sync myapp-staging\`
+          - After prod PR merge: run \`argocd app sync myapp-prod\`
           SUMMARY

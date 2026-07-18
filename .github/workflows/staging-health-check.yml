@@ -1,0 +1,49 @@
+name: staging-health-check
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'envs/prod/values.yaml'
+      - 'applications/myapp-prod.yaml'
+
+jobs:
+  check-staging-health:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v4
+
+      - name: Install argocd CLI
+        run: |
+          curl -sSL -o argocd \
+            https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          chmod +x argocd
+
+      - name: Check myapp-staging health in ArgoCD
+        env:
+          ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+          ARGOCD_USERNAME: ${{ secrets.ARGOCD_USERNAME }}
+          ARGOCD_PASSWORD: ${{ secrets.ARGOCD_PASSWORD }}
+        run: |
+          ./argocd login "$ARGOCD_SERVER" \
+            --username "$ARGOCD_USERNAME" \
+            --password "$ARGOCD_PASSWORD" \
+            --insecure
+
+          # Get health + sync status
+          STATUS=$(./argocd app get myapp-staging \
+            --output json | jq -r '.status.health.status')
+          SYNC=$(./argocd app get myapp-staging \
+            --output json | jq -r '.status.sync.status')
+
+          echo "Staging health: $STATUS, sync: $SYNC"
+
+          if [ "$STATUS" != "Healthy" ] || [ "$SYNC" != "Synced" ]; then
+            echo "Staging is not Healthy + Synced. Blocking prod merge."
+            exit 1
+          fi
