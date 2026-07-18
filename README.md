@@ -140,6 +140,145 @@ In short: myapp values are for pre-deploy validation; Gitops-Argocd_1 values are
          - Syncs the cluster to those new values (deploying the new image from GHCR).
   So Gitops-Argocd_1 is the declarative desired state for each environment; OCI is the actual artifact that implements that state.
 
-  
+
+## Security scan job
+### What is a “security scan”?
+A security scan is an automated check that looks for known security problems in your software before you deploy it.
+
+In our case, it scans:
+  - The container image ghcr.io/gmphsplb/myapp@sha256:... for:
+      - Vulnerable OS packages (Debian, etc.).
+      - Vulnerable Python libraries and other dependencies.
+  - Your Dockerfile and Kubernetes manifests for misconfigurations (dangerous settings, insecure defaults).
+
+### Which tool is used and why?
+You use Trivy, an open‑source security scanner from Aqua Security.
+   - In the “Run Trivy vulnerability scanner” step, it runs:
+    ```console
+      text
+      trivy image ghcr.io/gmphsplb/myapp@sha256:...
+      This scans the built image for vulnerabilities.
+    ```
+   - In the “Run Trivy config scan” step, it runs a config scan (scan-type: "config") on your repository to look for insecure
+     Infrastructure‑as‑Code settings (Dockerfile, Kubernetes YAML).
+
+You chose Trivy because:
+  - It’s widely used, free, and supports images, files, and config.
+  - It integrates easily with GitHub Actions and can export results to SARIF so they show up in GitHub’s Security tab
+
+## Sign + attest job
+The “Sign + Attest” job is about trust and transparency for your image.
+
+### What does “sign” and “attest” mean?
+Sign: Create a digital signature on the image, proving:
+   - Who built it (identity).
+   - That it hasn’t been tampered with (integrity).
+Attest: Attach signed extra information about the image, such as:
+   - SBOM (what’s inside).
+   - Build details (when, how, from which repo).
+You use Cosign to sign and attest, and Syft to generate SBOM.
+
+## What is SBOM?
+SBOM = Software Bill of Materials.
+  - It’s like an ingredient list for your software.
+  - It lists all components, libraries, and dependencies inside your image in a machine‑readable format.
+  - SBOM helps you:
+     - Know exactly what’s inside the image.
+     - Quickly check for vulnerable or outdated components.
+     - Meet security and compliance requirements (e.g., government SBOM mandates).
+Syft is the tool generating this SBOM for your image.
+
+## OIDC token and keyless signing (Cosign + Sigstore)
+Your Cosign step uses keyless signing via Sigstore.
+
+### What is an OIDC token?
+OIDC = OpenID Connect, an identity protocol.
+  - An OIDC token is a signed token that says:
+      - “This GitHub Actions job is running in repo gMpHSpLB/myapp, on this workflow, by this actor.”
+When the pipeline runs, GitHub can give an OIDC token that proves which repo and workflow started this job.
+
+### “GitHub Actions provides OIDC token proving this job ran from this repo”
+Meaning:
+  - Cosign asks GitHub: “Who am I?”.
+  - GitHub returns an OIDC token saying:
+      - “This request comes from a GitHub Actions job for repository gMpHSpLB/myapp (and specific workflow).”
+  - Cosign uses that token as the identity of the signer.
+So you don’t log in with a username/password; the CI job itself is the identity.
+
+### What is Fulcio CA and what does it do?
+Fulcio is Sigstore’s certificate authority (CA).
+  - It takes the OIDC token from GitHub and checks that it’s valid.
+  - Then it issues a short‑lived certificate that says:
+        “This temporary key belongs to the GitHub Actions identity for repo gMpHSpLB/myapp.”
+
+### “Fulcio CA issues a short-lived certificate bound to the OIDC identity”
+Meaning:
+  - A temporary public/private keypair is created in memory.
+  - Fulcio gives a certificate that ties that key to the GitHub Actions identity (your repo/workflow).
+  - The certificate only lives for a short time (minutes), then expires.
+So instead of a long‑lived private key you have to store, you get a disposable certificate linked to “this CI job”.
+
+### What does “Cosign signs the image digest with the certificate key” mean?
+Your command:
+```console
+  bash
+  cosign sign \
+    --yes \
+    --oidc-issuer=https://token.actions.githubusercontent.com \
+    "ghcr.io/gmphsplb/myapp@${DIGEST}"
+```
+What happens:
+  - Cosign computes the digest (hash) of the image (sha256:…).
+  - It uses the temporary private key (from Fulcio’s certificate) to create a digital signature over that digest.
+  - That signature can later be verified with the corresponding public key/certificate.
+
+So “sign the image digest” means: lock the image’s hash with a cryptographic signature tied to your CI identity.
+
+### “Signature stored in OCI registry as a separate manifest”
+Cosign stores the signature in GHCR next to the image, not inside it.
+  - GHCR supports extra “manifest” objects associated with an image.
+  - Cosign pushes a signature object that says:
+      - “Here is the signature for ghcr.io/gmphsplb/myapp@sha256:....”
+So:
+  - The image stays the same.
+  - The registry holds an additional signed record saying “this image was signed by your CI job”.
+
+### What is Sigstore Rekor and “transparency log records the signature permanently”?
+Rekor is Sigstore’s transparency log.
+  - It’s a public, append‑only log of all signatures and attestations.
+  - Every time you sign, a record is written that includes:
+       - Image digest.
+       - Certificate.
+       - Signature.
+       - Timestamp.
+
+### “Records the signature permanently” means:
+  - The signing event is stored in Rekor.
+  - Anyone can later look up:
+      - When it was signed.
+      - By which identity.
+      - For which artifact.
+
+This gives an audit trail and makes it much harder for an attacker to fake or hide signatures.
+
+### “Key never stored anywhere — certificate expires after the signing”
+This summarizes why it’s called keyless signing:
+  - The private key used to sign:
+      - Exists only in memory during the signing.
+      - Is destroyed afterwards.
+  The certificate:
+      - Is short‑lived (expires quickly).
+      - Attests to the identity at signing time.
+
+You don’t:
+  - Generate and store long‑term signing keys.
+  - Manage key rotation or secret storage for signing keys.
+
+Instead:
+  - Each CI run gets a fresh, short‑lived identity and key.
+  - Rekor’s log and Fulcio’s certificate provide trust and verifiability.
+
+This reduces risk: there is no long‑lived private key that can be stolen.
+
 <img width="2720" height="1840" alt="t05_job4_5_6_data_flow" src="https://github.com/user-attachments/assets/7f49da37-e103-4ec8-823c-26a2454434ab" />
 
