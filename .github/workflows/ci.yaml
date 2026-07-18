@@ -587,23 +587,31 @@ jobs:
         run: |
           DIGEST="${{ needs.build.outputs.image-digest }}"
 
+          # Rebuild owner + image name safely
+          OWNER_LC="${{ github.repository_owner }}"
+          OWNER_LC="${OWNER_LC,,}"    # lowercase
+          IMAGE_NAME="${OWNER_LC}/myapp"
+
           # Create a branch for the prod update
           BRANCH="prod-deploy-${{ github.sha }}"
-          git checkout -b $BRANCH
+          git checkout -b "$BRANCH"
 
-          # Update prod values to use the same fixed image
+          # Update existing image block
           yq -i ".image.digest = \"${DIGEST}\"" envs/prod/values.yaml
           yq -i ".image.tag = \"sha-${{ github.sha }}\"" envs/prod/values.yaml
-          yq -i ".image.repository = \"${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\"" envs/prod/values.yaml
+          yq -i ".image.repository = \"${{ env.REGISTRY }}/${IMAGE_NAME}\"" envs/prod/values.yaml
 
           git add envs/prod/values.yaml
           git commit -m "chore(prod): deploy ${{ github.sha }}"
-          git push origin $BRANCH
+          git push origin "$BRANCH"
 
           # Create PR using GitHub CLI
           gh pr create \
             --title "Deploy ${{ github.sha }} to prod" \
-            --body "## Changes
+            --body "Deploy \`${IMAGE_NAME}@${DIGEST}\` to prod." \
+            --base main \
+            --head "$BRANCH" \
+            --reviewer "${{ github.actor }}"
 
           Deploy \`${{ env.IMAGE_NAME }}@${DIGEST}\` to prod.
 
