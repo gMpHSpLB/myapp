@@ -188,6 +188,36 @@ SBOM = Software Bill of Materials.
      - Meet security and compliance requirements (e.g., government SBOM mandates).
 Syft is the tool generating this SBOM for your image.
 
+Syft SBOM attestation
+Your pipeline then:
+
+Uses Syft to generate SBOMs (CycloneDX and SPDX) for the image.
+
+Uses Cosign attest to attach the SBOM as an attestation:
+
+bash
+cosign attest \
+  --yes \
+  --type cyclonedx \
+  --predicate sbom.cyclonedx.json \
+  "ghcr.io/gmphsplb/myapp@sha256:..."
+Meaning:
+
+The SBOM file (CycloneDX format) is sent to GHCR as an attestation linked to the image.
+
+It is signed with the same keyless mechanism, so:
+
+You can verify it was created by your CI.
+
+You can trust the SBOM has not been tampered with.
+
+Later, anyone with access to the image can run:
+
+bash
+cosign verify-attestation --type cyclonedx ghcr.io/gmphsplb/myapp@sha256:...
+to fetch and verify the SBOM attestation, getting a trusted ingredient list for the image.
+
+
 ## OIDC token and keyless signing (Cosign + Sigstore)
 Your Cosign step uses keyless signing via Sigstore.
 
