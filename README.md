@@ -141,8 +141,8 @@ In short: myapp values are for pre-deploy validation; Gitops-Argocd_1 values are
   So Gitops-Argocd_1 is the declarative desired state for each environment; OCI is the actual artifact that implements that state.
 
 
-## Security scan job
-### What is a “security scan”?
+# Security scan job
+## What is a “security scan”?
 A security scan is an automated check that looks for known security problems in your software before you deploy it.
 
 In our case, it scans:
@@ -151,7 +151,7 @@ In our case, it scans:
       - Vulnerable Python libraries and other dependencies.
   - Your Dockerfile and Kubernetes manifests for misconfigurations (dangerous settings, insecure defaults).
 
-### Which tool is used and why?
+## Which tool is used and why?
 You use Trivy, an open‑source security scanner from Aqua Security.
    - In the “Run Trivy vulnerability scanner” step, it runs:
     ```console
@@ -166,10 +166,10 @@ You chose Trivy because:
   - It’s widely used, free, and supports images, files, and config.
   - It integrates easily with GitHub Actions and can export results to SARIF so they show up in GitHub’s Security tab
 
-## Sign + attest job
+# Sign + attest job
 The “Sign + Attest” job is about trust and transparency for your image.
 
-### What does “sign” and “attest” mean?
+## What does “sign” and “attest” mean?
 Sign: Create a digital signature on the image, proving:
    - Who built it (identity).
    - That it hasn’t been tampered with (integrity).
@@ -213,16 +213,16 @@ cosign verify-attestation --type cyclonedx ghcr.io/gmphsplb/myapp@sha256:...
 to fetch and verify the SBOM attestation, getting a trusted ingredient list for the image.
 
 
-## OIDC token and keyless signing (Cosign + Sigstore)
+# OIDC token and keyless signing (Cosign + Sigstore)
 Your Cosign step uses keyless signing via Sigstore.
 
-### What is an OIDC token?
+## What is an OIDC token?
 OIDC = OpenID Connect, an identity protocol.
   - An OIDC token is a signed token that says:
       - “This GitHub Actions job is running in repo gMpHSpLB/myapp, on this workflow, by this actor.”
 When the pipeline runs, GitHub can give an OIDC token that proves which repo and workflow started this job.
 
-### “GitHub Actions provides OIDC token proving this job ran from this repo”
+## “GitHub Actions provides OIDC token proving this job ran from this repo”
 Meaning:
   - Cosign asks GitHub: “Who am I?”.
   - GitHub returns an OIDC token saying:
@@ -268,7 +268,7 @@ So:
   - The image stays the same.
   - The registry holds an additional signed record saying “this image was signed by your CI job”.
 
-### What is Sigstore Rekor and “transparency log records the signature permanently”?
+## What is Sigstore Rekor and “transparency log records the signature permanently”?
 Rekor is Sigstore’s transparency log.
   - It’s a public, append‑only log of all signatures and attestations.
   - Every time you sign, a record is written that includes:
@@ -277,7 +277,7 @@ Rekor is Sigstore’s transparency log.
        - Signature.
        - Timestamp.
 
-### “Records the signature permanently” means:
+## “Records the signature permanently” means:
   - The signing event is stored in Rekor.
   - Anyone can later look up:
       - When it was signed.
@@ -286,7 +286,7 @@ Rekor is Sigstore’s transparency log.
 
 This gives an audit trail and makes it much harder for an attacker to fake or hide signatures.
 
-### “Key never stored anywhere — certificate expires after the signing”
+## “Key never stored anywhere — certificate expires after the signing”
 This summarizes why it’s called keyless signing:
   - The private key used to sign:
       - Exists only in memory during the signing.
