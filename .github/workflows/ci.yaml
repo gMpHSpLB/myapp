@@ -583,6 +583,52 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITOPS_PAT }}
 
+      # - name: Create PR to prod (not auto-merged)
+      #   run: |
+      #     DIGEST="${{ needs.build.outputs.image-digest }}"
+
+      #     # Rebuild owner + image name safely
+      #     OWNER_LC="${{ github.repository_owner }}"
+      #     OWNER_LC="${OWNER_LC,,}"    # lowercase
+      #     IMAGE_NAME="${OWNER_LC}/myapp"
+
+      #     # Create a branch for the prod update
+      #     BRANCH="prod-deploy-${{ github.sha }}"
+      #     git checkout -b "$BRANCH"
+
+      #     # Update existing image block
+      #     yq -i ".image.digest = \"${DIGEST}\"" envs/prod/values.yaml
+      #     yq -i ".image.tag = \"sha-${{ github.sha }}\"" envs/prod/values.yaml
+      #     yq -i ".image.repository = \"${{ env.REGISTRY }}/${IMAGE_NAME}\"" envs/prod/values.yaml
+
+      #     git add envs/prod/values.yaml
+      #     git commit -m "chore(prod): deploy ${{ github.sha }}"
+      #     git push origin "$BRANCH"
+
+      #     # Create PR using GitHub CLI
+      #     gh pr create \
+      #       --title "Deploy ${{ github.sha }} to prod" \
+      #       --body "Deploy \`${IMAGE_NAME}@${DIGEST}\` to prod." \
+      #       --base main \
+      #       --head "$BRANCH" \
+      #       --reviewer "${{ github.actor }}"
+
+      #     **Source commit:** [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+      #     **CI run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+      #     **Checklist before merging:**
+      #     - [ ] Staging environment validated
+      #     - [ ] No critical alerts in staging Grafana
+      #     - [ ] Production readiness confirmed (feature flags, rollout plan)
+      #     - [ ] QA / Product sign-off
+
+      #     Merging this PR will trigger ArgoCD to sync myapp-prod." \
+      #                 --base main \
+      #                 --head $BRANCH \
+      #                 --reviewer "${{ github.actor }}"
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITOPS_PAT }}
+
       - name: Create PR to prod (not auto-merged)
         run: |
           DIGEST="${{ needs.build.outputs.image-digest }}"
@@ -605,27 +651,31 @@ jobs:
           git commit -m "chore(prod): deploy ${{ github.sha }}"
           git push origin "$BRANCH"
 
-          # Create PR using GitHub CLI
+          # Prepare PR body in a temp file (multiline markdown safely)
+          cat > pr_body.md <<EOF
+## Changes
+
+Deploy \`${IMAGE_NAME}@${DIGEST}\` to prod.
+
+**Source commit:** [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+**CI run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+**Checklist before merging:**
+- [ ] Staging environment validated
+- [ ] No critical alerts in staging Grafana
+- [ ] Production readiness confirmed (feature flags, rollout plan)
+- [ ] QA / Product sign-off
+
+Merging this PR will trigger ArgoCD to sync myapp-prod.
+EOF
+
+          # Create PR using GitHub CLI (single call)
           gh pr create \
             --title "Deploy ${{ github.sha }} to prod" \
-            --body "Deploy \`${IMAGE_NAME}@${DIGEST}\` to prod." \
+            --body-file pr_body.md \
             --base main \
             --head "$BRANCH" \
             --reviewer "${{ github.actor }}"
-
-          **Source commit:** [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
-          **CI run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
-          **Checklist before merging:**
-          - [ ] Staging environment validated
-          - [ ] No critical alerts in staging Grafana
-          - [ ] Production readiness confirmed (feature flags, rollout plan)
-          - [ ] QA / Product sign-off
-
-          Merging this PR will trigger ArgoCD to sync myapp-prod." \
-                      --base main \
-                      --head $BRANCH \
-                      --reviewer "${{ github.actor }}"
         env:
           GH_TOKEN: ${{ secrets.GITOPS_PAT }}
 
