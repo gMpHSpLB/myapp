@@ -613,8 +613,6 @@ jobs:
             --head "$BRANCH" \
             --reviewer "${{ github.actor }}"
 
-          Deploy \`${{ env.IMAGE_NAME }}@${DIGEST}\` to prod.
-
           **Source commit:** [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
           **CI run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
