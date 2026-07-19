@@ -653,21 +653,21 @@ jobs:
 
           # Prepare PR body in a temp file (multiline markdown safely)
           cat > pr_body.md <<EOF
-## Changes
+          ## Changes
 
-Deploy \`${IMAGE_NAME}@${DIGEST}\` to prod.
+          Deploy \`${IMAGE_NAME}@${DIGEST}\` to prod.
 
-**Source commit:** [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
-**CI run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          **Source commit:** [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+          **CI run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
-**Checklist before merging:**
-- [ ] Staging environment validated
-- [ ] No critical alerts in staging Grafana
-- [ ] Production readiness confirmed (feature flags, rollout plan)
-- [ ] QA / Product sign-off
+          **Checklist before merging:**
+          - [ ] Staging environment validated
+          - [ ] No critical alerts in staging Grafana
+          - [ ] Production readiness confirmed (feature flags, rollout plan)
+          - [ ] QA / Product sign-off
 
-Merging this PR will trigger ArgoCD to sync myapp-prod.
-EOF
+          Merging this PR will trigger ArgoCD to sync myapp-prod.
+          EOF
 
           # Create PR using GitHub CLI (single call)
           gh pr create \
